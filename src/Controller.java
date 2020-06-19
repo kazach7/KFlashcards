@@ -1,106 +1,131 @@
-import java.io.FileNotFoundException;
-import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
+import java.util.Optional;
 
 class Controller {
     private View view;
     private Model model;
 
-    final int maxGrade;
-
     Controller(View view, Model model) {
         this.view = view;
         this.model = model;
 
-        maxGrade = 6;
-
-        model.setMaxGrade(maxGrade);
         try {
             model.loadResourcesFromFiles();
         }
-        catch(FileNotFoundException e){
-            view.displayMessage("Could not load lesson: " + e.getMessage() + "!");
+        catch (Exception e){
+            view.displayMessage("An unexpected error occurred while loading resources. Please restart the application.\n" +
+                    "The application will be closed now automatically. We are sorry for the inconvenience.");
+            System.exit(1);
         }
 
-        ArrayList<Lesson> lessons = model.getLessons();
-        ArrayList<String> lessonNames = new ArrayList<>();
-        for (Lesson lesson : lessons){
-            lessonNames.add(lesson.getName());
-        }
-        view.initializeLessonsList(lessonNames);
+        view.initializeLessonsList(model.getLessonNamesList());
+        view.closeLoadingResourcesFrame();
+        /*ArrayList<String> lessonsList = fileManager.loadLessonsListFromFile();
+
+        boolean[] rememberDecision = {false, false};
+        int[] decision = {1,1};
+        for (String lessonName : lessonsList) {
+            ArrayList<String> lessonAsString;
+            try {
+                lessonAsString = fileManager.loadLessonFromFile(lessonName);
+            } catch (FileNotFoundException e) {
+                throw new FileNotFoundException(e.getMessage());
+            }
+
+            if (lessonAsString.size() % 3 != 0){
+                    if (!rememberDecision[0]) {
+                        int dec = view.displayOptionDialog("Lesson '" + lessonName + "' data has been corrupted. " +
+                                        "Loading it may lead to missing files and/or erroneous flashcards. Load anyway?",
+                                "Question", new String[]{"Yes", "No", "Yes, remember decision", "No, remember decision"}, 1);
+                        if (dec > 1) {
+                            rememberDecision[0] = true;
+                            decision[0] = dec - 2;
+                        }
+                    }
+                    if (decision[0] == 1) {
+                        if (!rememberDecision[1]) {
+                            int dec = view.displayOptionDialog("Remove the lesson?", "Question",
+                                    new String[]{"Yes", "No", "Yes, remember decision", "No, remember decision"}, 1);
+                            if (dec > 1) {
+                                rememberDecision[1] = true;
+                                decision[1] = dec - 2;
+                            }
+                        }
+                        if (decision[1] == 0) {
+                            // remove lesson.
+                        }
+                        continue;
+                    }
+                    // User wants to load it - remove the incomplete ending;
+                   do lessonAsString.remove(lessonAsString.size()-1);
+                   while (lessonAsString.size() % 3 != 0);
+            }
+
+                // Load the lesson into the model.
+                model.addLesson(lessonName, lessonAsString);
+            }
+
+        }*/
     }
 
-    void editLesson(int lessonIndex) {
-        ArrayList<String> flashcardsQuestionsList = model.getFlashcardsQuestions(lessonIndex);
-        view.openEditLessonFrame(flashcardsQuestionsList);
-    }
-
-    void removeLesson(int lessonIndex) {
-        model.removeLesson(lessonIndex);
-        view.removeLesson(lessonIndex);
-    }
-
-    void learnLesson(int lessonIndex) {
-        try {
-            model.setCurrentLesson(lessonIndex);
-        } catch (IndexOutOfBoundsException e) {
-            view.displayMessage("The lesson does not exist!");
-            // TODO remove the lesson from the list in GUI?
-            return;
-        }
-
-        if (model.checkLessonEmptiness()) {
-            view.displayMessage("No cards in the lesson! Select 'Edit lesson' to add some.");
-            return;
-        }
-
-        model.randomOrder();    // The order is random by default.
-
-        view.openLearnLessonFrame(model.getFlashcardToDisplay(), model.getLearnedFlashcardsQuantity(), model.getCurrentLessonSize());
-    }
-
-    void finishLearning (int lessonIndex){
-        model.updateGradesInFile(lessonIndex);
-        view.closeLearnLessonFrame();
-    }
+    /* Responses to actions related to the main frame and the editing frames. */
     void addLesson(String lessonName) {
-        if (lessonName.length() == 0) {
-            view.displayMessage("Lesson name can't be empty!");
-            return;
+        boolean success = model.addLesson(lessonName);
+        if (success){
+            view.addNewLessonToTheList(lessonName);
         }
-        else if (lessonName.contains("\\") || lessonName.contains("/") || lessonName.contains("\"")){
-            view.displayMessage("Lesson name can't contain characters: \", \\, /");
-            return;
-        }
-        try {
-            model.addLesson(lessonName);
-        } catch (FileAlreadyExistsException e) {
-            view.displayMessage("Lesson names must be unique!");
-            return;
-        }
-        view.addLesson(lessonName);
     }
-
+    void removeLesson(int lessonIndex) {
+        boolean success = model.removeLesson(lessonIndex);
+        if (success){
+            view.removeLessonFromTheList(lessonIndex);
+        }
+    }
+    void startEditingLesson(int lessonIndex) {
+        view.openEditLessonFrame(model.getFlashcardQuestionsList(lessonIndex));
+    }
     void finishEditingLesson() {
+        //model.saveLessonStateInFile();
         view.closeEditLessonFrame();
     }
-
-    void addFlashcard() {
-        view.openEditFlashcardFrame(null, null);
-    }
-
-    void editFlashcard(int flashcardIndex, int lessonIndex) {
-        Flashcard flashcard;
-        try {
-            flashcard = model.getFlashcard(flashcardIndex, lessonIndex);
-        } catch (IndexOutOfBoundsException e) {
-            view.displayMessage("The flashcard does not exist!");
-            // TODO moze usunac nieistniejaca fiszke z listy? ale ogarnac czy lessonIndex nie mogl wywolac wyjatku
-            return;
+    void startLearningLesson(int lessonIndex) {
+        model.setCurrentLesson(lessonIndex);
+        int lessonSize = model.getCurrentLessonSize();
+        if (lessonSize == 0) {
+            view.displayMessage("No cards in the lesson! Select 'Edit lesson' to add some.");
         }
-        view.openEditFlashcardFrame(flashcard.getQuestion(), flashcard.getAnswer());
+        else {
+            model.setRandomOrder();
+            if (model.getLearnedFlashcardsInCurrentLessonCount() == lessonSize) {
+                // Whole lesson learned. Don't display any flashcard.
+                view.openLearnLessonFrame(Optional.empty(), Optional.empty(), lessonSize, lessonSize);
+            } else {
+                view.openLearnLessonFrame(Optional.of(model.getCurrentFlashcardQuestion()), Optional.of(model.getCurrentFlashcardGrade()),
+                        model.getLearnedFlashcardsInCurrentLessonCount(), lessonSize);
+            }
+        }
+    }
+    void finishLearningLesson (int lessonIndex){
+        model.updateAllGradesInLessonInDatabase(lessonIndex);
+        //model.saveLessonStateInFile();
+        view.closeLearnLessonFrame();
     }
 
+    void startAddingFlashcard() {
+        view.openEditFlashcardFrame(Optional.empty(), Optional.empty());
+    }
+    void startEditingFlashcard(int flashcardIndex, int lessonIndex) {
+        view.openEditFlashcardFrame(Optional.of(model.getFlashcardQuestion(flashcardIndex, lessonIndex)),
+                Optional.of(model.getFlashcardAnswer(flashcardIndex, lessonIndex)));
+    }
+    void saveAddedOrEditedFlashcard(int flashcardIndex, int lessonIndex, String question, String answer) {
+        boolean success = model.saveFlashcard(flashcardIndex, lessonIndex, question, answer);
+        if (success){
+            view.updateAddedOrEditedFlashcardOnTheList(flashcardIndex);
+        }
+    }
+    void cancelEditingFlashcard() {
+        view.closeEditFlashcardFrame();
+    }
     void removeFlashcard(int flashcardIndex, int lessonIndex) {
         try {
             model.removeFlashcard(flashcardIndex, lessonIndex);
@@ -108,78 +133,51 @@ class Controller {
             e.printStackTrace();
             view.displayMessage("The flashcard did not exist!");
         }
-        view.removeFlashcard();
+        view.removeFlashcardFromTheList();
     }
 
-    void saveFlashcard(int flashcardIndex, int lessonIndex, String question, String answer) {
-        if (question.length() == 0) {
-            view.displayMessage("The front can't be empty!");
-            return;
-        }
-        else if (question.contains("\"") || question.contains("\\") || question.contains("/") ||
-                  answer.contains("\"") || answer.contains("\\") || answer.contains("/")) {
-            view.displayMessage("Flashcards can't contain characters: \", \\, /");
-            return;
-        }
-        try {
-            model.saveFlashcard(flashcardIndex, lessonIndex, new Flashcard(question, answer));
-        } catch (FileAlreadyExistsException e) {
-            view.displayMessage("Flashcard fronts must be unique!");
-            return;
-        }
-        view.saveFlashcard(flashcardIndex); // Pass the index to update the flashcards list in the GUI.
-    }
-
-    void cancelEditingFlashcard() {
-        view.closeEditFlashcardFrame();
-    }
-
+    /* Responses to actions related to the learning frame. */
     void setRandomOrder() {
-        try {
-            model.randomOrder();
-        } catch (NullPointerException e) {
-            e.printStackTrace();
+        boolean isThereNotLearnedFlashcard = model.setRandomOrder();
+        if (isThereNotLearnedFlashcard){
+            view.updateCurrentlyLearnedFlashcard(model.getCurrentFlashcardQuestion(), model.getCurrentFlashcardGrade());
+        } else {
+            view.lessonLearned();
         }
-
-        view.nextFlashcard(model.getFlashcardToDisplay());
     }
-
     void setGradeOrder() {
-        try {
-            model.gradeOrder();
-        } catch (NullPointerException e) {
-            e.printStackTrace();
+        boolean isThereNotLearnedFlashcard = model.setGradeOrder();
+        if (isThereNotLearnedFlashcard){
+            view.updateCurrentlyLearnedFlashcard(model.getCurrentFlashcardQuestion(), model.getCurrentFlashcardGrade());
+        } else {
+            view.lessonLearned();
         }
-
-        view.nextFlashcard(model.getFlashcardToDisplay());
     }
 
-    void resetAllGrades() {
-        try {
-            model.resetAllGrades();
-        } catch (NullPointerException e) {
-            e.printStackTrace();
-        }
-
-        view.resetAllGrades();
+    void resetAllGradesInCurrentLesson() {
+        model.resetAllGradesInCurrentLesson();
+        view.resetLearnedFlashcardsCounterToZero();
     }
-
     void checkAnswer(String answer) {
-        String correctAnswer = model.getCurrentFlashcard().getAnswer();
+        String correctAnswer = model.getCurrentFlashcardAnswer();
         if (correctAnswer.equals(answer)) {
             view.correctAnswer();
-            model.correctAnswer();
+            model.incrementCurrentFlashcardGrade();
         } else {
             view.incorrectAnswer(correctAnswer);
-            model.incorrectAnswer();
+            model.resetCurrentFlashcardGrade();
         }
     }
-
     void askNextQuestion(boolean wasCurrentQuestionAnswered) {
         if (!wasCurrentQuestionAnswered) { // Skipping a question has the same consequences as answering it wrong.
-            model.incorrectAnswer();
+            model.resetCurrentFlashcardGrade();
         }
-        view.nextFlashcard(model.getFlashcardToDisplay());
+        boolean isThereNextOne = model.setCurrentFlashcardToNextOne();
+        if (isThereNextOne){
+            view.updateCurrentlyLearnedFlashcard(model.getCurrentFlashcardQuestion(), model.getCurrentFlashcardGrade());
+        } else {
+            view.lessonLearned();
+        }
     }
 }
    /*

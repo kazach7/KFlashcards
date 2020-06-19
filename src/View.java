@@ -2,18 +2,20 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
+import java.util.Optional;
 
 class View {
     private Controller controller;
 
     // Windows (frames).
-    private MainFrame mainFrame;                    // Main frame of the app, containing a list of lessons.
-    //private AddLessonFrame addLessonFrame;          // Providing name for a new lesson frame.
-    private EditLessonFrame editLessonFrame;        // Lesson editing frame.
-    private EditFlashcardFrame editFlashcardFrame;  // Flashcard editing frame.
-    private LearningFrame learningFrame;            // Learning a lesson frame.
+    private MainFrame mainFrame;                   // Main frame of the app, containing a list of lessons.
+    //private AddLessonFrame addLessonFrame;         // Providing name for a new lesson frame.
+    private EditLessonFrame editLessonFrame;       // Lesson editing frame.
+    private EditFlashcardFrame editFlashcardFrame; // Flashcard editing frame.
+    private LearningFrame learningFrame;           // Learning a lesson frame.
+    private LoadingFrame loadingFrame;
+    private boolean displaySkipQuestionWarning;  // If true, the warning will show. It will only show once.
 
-    private boolean displaySkipQuestionWarning;            // If true, the warning will show. It will only show once.
 
     private class MainFrame extends JFrame {
         private JList<String> lessonsList;                  // List of lessons.
@@ -94,14 +96,14 @@ class View {
                             controller.addLesson(lessonName);
                         }
                     } else if (e.getSource() == editLessonButton) {
-                        controller.editLesson(mainFrame.lessonsList.getSelectedIndex());
+                        controller.startEditingLesson(mainFrame.lessonsList.getSelectedIndex());
                     } else if (e.getSource() == removeLessonButton) {
                         if(JOptionPane.showConfirmDialog(mainFrame, "Are you sure?", "Remove lesson", JOptionPane.YES_NO_OPTION)
                                 == JOptionPane.YES_OPTION){
                             controller.removeLesson(mainFrame.lessonsList.getSelectedIndex());
                         }
                     } else if (e.getSource() == learnLessonButton) {
-                        controller.learnLesson(mainFrame.lessonsList.getSelectedIndex());
+                        controller.startLearningLesson(mainFrame.lessonsList.getSelectedIndex());
                     }
                 }
             };
@@ -220,9 +222,9 @@ class View {
                 @Override
                 public void actionPerformed(ActionEvent e) {
                     if (e.getSource() == addFlashcardButton) {
-                        controller.addFlashcard();
+                        controller.startAddingFlashcard();
                     } else if (e.getSource() == editFlashcardButton) {
-                        controller.editFlashcard(flashcardsList.getSelectedIndex(), mainFrame.lessonsList.getSelectedIndex());
+                        controller.startEditingFlashcard(flashcardsList.getSelectedIndex(), mainFrame.lessonsList.getSelectedIndex());
                     } else if (e.getSource() == removeFlashcardButton) {
                         controller.removeFlashcard(flashcardsList.getSelectedIndex(), mainFrame.lessonsList.getSelectedIndex());
                     } else if (e.getSource() == doneButton){
@@ -253,7 +255,7 @@ class View {
         private JPanel flashcardPanel;
         private JPanel buttonPanel;
 
-        EditFlashcardFrame(String question, String answer) {
+        EditFlashcardFrame(Optional<String> question, Optional<String> answer) {
             questionLabel = new JLabel("Front:");
             answerLabel = new JLabel("Back:");
             questionTextField = new JTextField();
@@ -285,10 +287,21 @@ class View {
             this.add(flashcardPanel);
             this.add(buttonPanel);
 
-            // The contents of the frame look different depending if the user is adding or editing a flashcard.
-            initializeDependingOnPurpose(question);
+            if (question.isPresent()){
+                // The frame was opened to edit an existing flashcard.
+                setTitle("Edit flashcard");
+                buttonPanel.add(showAnswerCheckBox);
+                showAnswerCheckBox.setSelected(false);
+                questionTextField.setText(question.get());
+            }
+            else{
+                // The frame was opened to add a new flashcard.
+                setTitle("Add flashcard");
+                questionTextField.setText("");
+            }
+            answerTextField.setText("");
 
-            createActionListener(question, answer);
+            createActionListener(answer);
 
             addWindowListener(new WindowAdapter() {
                 @Override
@@ -304,33 +317,27 @@ class View {
             this.setVisible(true);
         }
 
-        private void createActionListener(String question, String answer) {
-            ActionListener actionListener = new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    if (e.getSource() == saveButton ||
-                            e.getSource() == questionTextField || e.getSource() == answerTextField) {
-                        int flashcardIndex;
-                        if (question == null) { // We are saving a new flashcard.
-                            flashcardIndex = editLessonFrame.flashcardsListModel.getSize();
-                        }
-                        else {  // We are saving an edited flashcard.
-                            flashcardIndex = editLessonFrame.flashcardsList.getSelectedIndex();
-                        }
-                        controller.saveFlashcard(flashcardIndex, mainFrame.lessonsList.getSelectedIndex(), questionTextField.getText(), answerTextField.getText());
-                    } else if (e.getSource() == cancelButton) {
-                        controller.cancelEditingFlashcard();
-                    } else if (e.getSource() == showAnswerCheckBox){
-                        if (showAnswerCheckBox.getModel().isSelected()){
-                            answerTextField.setText(answer);
-                        }
-                        else{
-                            if (answerTextField.getText().equals(answer)){
-                                // Set blank only if the user hasn't changed the field's content.
-                                // He might have of course changed it and then reentered the original content,
-                                // this case can be checked and distinguished (maybe later. Is it worth it though?).
-                                answerTextField.setText("");
-                            }
+        private void createActionListener(Optional<String> originalAnswer) {
+            ActionListener actionListener = e -> {
+                if (e.getSource() == saveButton ||
+                        e.getSource() == questionTextField || e.getSource() == answerTextField) {
+                    int flashcardIndex;
+                    if (originalAnswer.isPresent()) { // We are saving an edited flashcard.
+                        flashcardIndex = editLessonFrame.flashcardsList.getSelectedIndex();
+                    }
+                    else { // We are saving a new flashcard.
+                        flashcardIndex = editLessonFrame.flashcardsListModel.getSize();
+                    }
+                    controller.saveAddedOrEditedFlashcard(flashcardIndex, mainFrame.lessonsList.getSelectedIndex(), questionTextField.getText(), answerTextField.getText());
+                } else if (e.getSource() == cancelButton) {
+                    controller.cancelEditingFlashcard();
+                } else if (e.getSource() == showAnswerCheckBox){
+                    if (showAnswerCheckBox.getModel().isSelected()){
+                        answerTextField.setText(originalAnswer.get());
+                    }
+                    else{
+                        if (answerTextField.getText().equals(originalAnswer.get())){
+                            answerTextField.setText("");
                         }
                     }
                 }
@@ -340,27 +347,11 @@ class View {
             cancelButton.addActionListener(actionListener);
             questionTextField.addActionListener(actionListener);
             answerTextField.addActionListener(actionListener);
-            if (question != null){
+            if (originalAnswer.isPresent()){
                 // Add the listener only if the frame was opened for editing an existing flashcard purpose.
                 // Is this really necessary? The check box wouldn't be added to the panel otherwise.
                 showAnswerCheckBox.addActionListener(actionListener);
             }
-        }
-
-        void initializeDependingOnPurpose(String question){
-            if (question == null){
-                // The frame was opened in order to add a new flashcard.
-                setTitle("Add flashcard");
-                questionTextField.setText("");
-            }
-            else{
-                // The frame was opened in order to edit an existing flashcard.
-                setTitle("Edit flashcard");
-                buttonPanel.add(showAnswerCheckBox);
-                showAnswerCheckBox.setSelected(false);
-                questionTextField.setText(question);
-            }
-            answerTextField.setText("");
         }
     }
 
@@ -387,7 +378,7 @@ class View {
         private JLabel gradeLabel;
         private JTextField gradeTextField;
 
-        LearningFrame(Flashcard initialFlashcard, int learnedFlashcardsQuantity, int flashcardsQuantity) {
+        LearningFrame(Optional<String> initialQuestion, Optional<Integer> initialGrade, long learnedFlashcardsCount, int allFlashcardsCount) {
             buttonPanel = new JPanel();
             flashcardPanel = new JPanel();
             gradePanel = new JPanel();
@@ -400,12 +391,12 @@ class View {
             answerTextField = new JTextField();
             answerTextField.setDisabledTextColor(Color.BLACK);
             learnedLabel = new JLabel("Learned flashcards:");
-            learnedTextField = new JTextField(String.valueOf(learnedFlashcardsQuantity));
+            learnedTextField = new JTextField(String.valueOf(learnedFlashcardsCount));
             learnedTextField.setOpaque(false);
             learnedTextField.setDisabledTextColor(Color.BLACK);
             learnedTextField.setEnabled(false);
             learnedTextField.setBorder(BorderFactory.createEmptyBorder());
-            sizeLabel = new JLabel("/ " + flashcardsQuantity);
+            sizeLabel = new JLabel("/ " + allFlashcardsCount);
             checkButton = new JButton("Check");
             nextButton = new JButton("Next");
 
@@ -446,18 +437,28 @@ class View {
             this.add(flashcardPanel, BorderLayout.CENTER);
             this.add(gradePanel, BorderLayout.SOUTH);
 
-            displayInitialFlashcard(initialFlashcard);
+            if (initialQuestion.isPresent()){
+                assert (initialGrade.isPresent());
+                questionLabel.setText(initialQuestion.get());
+                gradeTextField.setText(initialGrade.get().toString());
+            }
+            else {
+                checkButton.setEnabled(false);
+                nextButton.setEnabled(false);
+                answerTextField.setEnabled(false);
+                displayMessage("The lesson is learned! You can reset all grades by clicking the button.");
+            }
 
             addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosing(WindowEvent e) {
-                    controller.finishLearning(mainFrame.lessonsList.getSelectedIndex());
+                    controller.finishLearningLesson(mainFrame.lessonsList.getSelectedIndex());
                 }
             });
 
             createButtonListener();
 
-            this.setTitle("Lesson " + String.valueOf(mainFrame.lessonsList.getSelectedIndex()+1));
+            this.setTitle("Lesson " + (mainFrame.lessonsList.getSelectedIndex() + 1));
             this.setSize(500, 300);
             this.setResizable(false);
             this.setLocationRelativeTo(mainFrame);
@@ -474,7 +475,7 @@ class View {
                     } else if (e.getSource() == gradeOrderButton) {
                         controller.setGradeOrder();
                     } else if (e.getSource() == resetButton) {
-                        controller.resetAllGrades();
+                        controller.resetAllGradesInCurrentLesson();
                     } else if (e.getSource() == checkButton
                                || (e.getSource() == answerTextField && checkButton.isEnabled())) {
                         controller.checkAnswer(answerTextField.getText());
@@ -503,108 +504,112 @@ class View {
             nextButton.addActionListener(buttonListener);
             answerTextField.addActionListener(buttonListener);
 
-            // TODO enable getting next question with ENTER after checking the answer
-        }
+            // TODO umozliwic pobranie nastepnego pytania enterem po sprawdzeniu odpowiedzi?
+            // ale w sumie teraz mozna spacja. Przydaloby sie za to dac domyslny focus w okienku wpisywania
 
-        void displayInitialFlashcard(Flashcard initialFlashcard) {
-            if (initialFlashcard == null) {
-                checkButton.setEnabled(false);
-                nextButton.setEnabled(false);
-                displayMessage("The lesson is learned! You can reset all grades by clicking the button.");
-            } else {
-                questionLabel.setText(initialFlashcard.getQuestion());
-                gradeTextField.setText(Integer.toString(initialFlashcard.getGrade()));
-            }
         }
 
         void correctAnswer(){
             answerTextField.setBackground(Color.GREEN);
-            gradeTextField.setText(String.valueOf(Integer.valueOf(gradeTextField.getText())+1));
-            if (gradeTextField.getText().equals(String.valueOf(controller.maxGrade))){
+            gradeTextField.setText(String.valueOf(Integer.parseInt(gradeTextField.getText())+1));
+            if (gradeTextField.getText().equals(String.valueOf(Model.MAX_GRADE))){
                 gradeTextField.setBackground(Color.GREEN);
-                learnedTextField.setText(String.valueOf(Integer.valueOf(learnedTextField.getText())+1));
+                learnedTextField.setText(String.valueOf(Integer.parseInt(learnedTextField.getText())+1));
             }
         }
-
         void incorrectAnswer(final String correctAnswer){
             answerTextField.setBackground(Color.RED);
             answerTextField.setText(correctAnswer);
             gradeTextField.setText("1");
         }
-
-        void updateFlashcard(final Flashcard flashcard){
-            if (flashcard == null){
-                nextButton.setEnabled(false);
-                displayMessage("Congratulations! You have learned the lesson.");
-                return;
-            }
-
-            questionLabel.setText(flashcard.getQuestion());
+        void updateFlashcard(String question, int grade){
+            questionLabel.setText(question);
             answerTextField.setBackground(Color.WHITE);
             answerTextField.setText("");
             answerTextField.setEnabled(true);
-            gradeTextField.setText(String.valueOf(flashcard.getGrade()));
+            gradeTextField.setText(String.valueOf(grade));
             gradeTextField.setBackground(Color.WHITE);
             checkButton.setEnabled(true);
+        }
+        void lessonLearned(){
+            nextButton.setEnabled(false);
+            displayMessage("Congratulations! You have learned the whole lesson.");
+        }
+        void resetLearnedFlashcardsCounterToZero() {
+            learningFrame.learnedTextField.setText("0");
+            learningFrame.gradeTextField.setBackground(Color.WHITE);
+            learningFrame.gradeTextField.setText("1");
+            learningFrame.nextButton.setEnabled(true);
+        }
+    }
+
+    private static class LoadingFrame extends JFrame {
+        LoadingFrame() {
+            JTextField textField = new JTextField("Loading resources...");
+            textField.setDisabledTextColor(Color.BLACK);
+            textField.setHorizontalAlignment(JTextField.CENTER);
+            textField.setEnabled(false);
+            this.add(textField);
+            this.setSize(150, 70);
+            this.setResizable(false);
+            this.setLocationRelativeTo(null);
+            this.setUndecorated(true);
+            this.setVisible(true);
         }
     }
 
     View() {
-        mainFrame = new MainFrame();
+        this.mainFrame = new MainFrame();
+        this.loadingFrame = new LoadingFrame();
+        this.mainFrame.setEnabled(false);
     }
 
     void setController(final Controller controller) {
         this.controller = controller;
     }
 
-    /*void openAddLessonFrame() {
-        addLessonFrame = new AddLessonFrame();
-        mainFrame.setEnabled(false);
-    }
-
-    void closeAddLessonFrame() {
-        mainFrame.setEnabled(true); // mainFrame must be enabled before addLessonFrame is disposed, otherwise it hides.
-        addLessonFrame.setVisible(false);
-        addLessonFrame.dispose();
-    }*/
-
     void initializeLessonsList(final ArrayList<String> lessonsList){
         mainFrame.initializeLessonsList(lessonsList);
     }
+
+    void closeLoadingResourcesFrame(){
+        this.mainFrame.setEnabled(true);
+        this.loadingFrame.setVisible(false);
+        this.loadingFrame.dispose();
+    }
+
     void openEditLessonFrame(final ArrayList<String> flashcardsQuestionsList) {
         editLessonFrame = new EditLessonFrame(flashcardsQuestionsList);
         mainFrame.setEnabled(false);
     }
-
     void closeEditLessonFrame(){
         mainFrame.setEnabled(true);
         editLessonFrame.setVisible(false);
         editLessonFrame.dispose();
     }
 
-    void openEditFlashcardFrame(final String question, final String answer) {
+    void openEditFlashcardFrame(Optional<String> question, Optional<String> answer) {
         editFlashcardFrame = new EditFlashcardFrame(question, answer);
         editLessonFrame.setEnabled(false);
     }
-
     void closeEditFlashcardFrame() {
         editLessonFrame.setEnabled(true);
         editFlashcardFrame.setVisible(false);
         editFlashcardFrame.dispose();
     }
 
-    void openLearnLessonFrame(Flashcard initialFlashcard, int learnedFlashcardsQuantity, int flashcardsQuantity){
-        learningFrame = new LearningFrame(initialFlashcard, learnedFlashcardsQuantity, flashcardsQuantity);
+    void openLearnLessonFrame(Optional<String> initialQuestion, Optional<Integer> initialGrade,
+                              long learnedFlashcardsCount, int allFlashcardsCount){
+        learningFrame = new LearningFrame(initialQuestion, initialGrade, learnedFlashcardsCount, allFlashcardsCount);
         mainFrame.setEnabled(false);
     }
-
     void closeLearnLessonFrame(){
         mainFrame.setEnabled(true);
         learningFrame.setVisible(false);
         learningFrame.dispose();
     }
 
-    void addLesson(String lessonName){
+    void addNewLessonToTheList(String lessonName){
         mainFrame.lessonsListModel.addElement(lessonName);
 
         if (mainFrame.lessonsListModel.getSize() == 1) {
@@ -614,8 +619,7 @@ class View {
         }
         mainFrame.lessonsList.setSelectedIndex(mainFrame.lessonsListModel.getSize()-1);
     }
-
-    void removeLesson(int lessonIndex){
+    void removeLessonFromTheList(int lessonIndex){
         mainFrame.lessonsListModel.remove(lessonIndex);
 
         if (mainFrame.lessonsListModel.getSize() == 0) {
@@ -633,7 +637,7 @@ class View {
         }
     }
 
-    void saveFlashcard(int flashcardIndex){
+    void updateAddedOrEditedFlashcardOnTheList(int flashcardIndex){
         String question = editFlashcardFrame.questionTextField.getText();
         closeEditFlashcardFrame();
 
@@ -649,8 +653,7 @@ class View {
             editLessonFrame.removeFlashcardButton.setEnabled(true);
         }
     }
-
-    void removeFlashcard(){
+    void removeFlashcardFromTheList(){
         int itemToRemoveIndex = editLessonFrame.flashcardsList.getSelectedIndex();
         editLessonFrame.flashcardsListModel.remove(itemToRemoveIndex);
 
@@ -675,17 +678,31 @@ class View {
     void incorrectAnswer(String correctAnswer){
         learningFrame.incorrectAnswer(correctAnswer);
     }
+    void updateCurrentlyLearnedFlashcard(String question, int grade){
+        learningFrame.updateFlashcard(question, grade);
+    }
+    void lessonLearned(){
+        learningFrame.lessonLearned();
+    }
+    void resetLearnedFlashcardsCounterToZero() {
+        learningFrame.resetLearnedFlashcardsCounterToZero();
+    }
 
-    void resetAllGrades() {
-        learningFrame.gradeTextField.setBackground(Color.WHITE);
-        learningFrame.gradeTextField.setText("1");
-        learningFrame.nextButton.setEnabled(true);
-        learningFrame.learnedTextField.setText("0");
-    }
-    void nextFlashcard(Flashcard flashcard){
-        learningFrame.updateFlashcard(flashcard);
-    }
     void displayMessage(String message) {
         JOptionPane.showMessageDialog(mainFrame, message);
     }
+    int displayOptionDialog(String message, String title, String[] options, int defaultValue){
+        return JOptionPane.showOptionDialog(mainFrame,  message, title, JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
+                null, options, options[defaultValue]);
+    }
+   /*void openAddLessonFrame() {
+        addLessonFrame = new AddLessonFrame();
+        mainFrame.setEnabled(false);
+    }
+
+    void closeAddLessonFrame() {
+        mainFrame.setEnabled(true); // mainFrame must be enabled before addLessonFrame is disposed, otherwise it hides.
+        addLessonFrame.setVisible(false);
+        addLessonFrame.dispose();
+    }*/
 }
