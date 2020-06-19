@@ -559,6 +559,8 @@ class View {
     View() {
         this.mainFrame = new MainFrame();
         this.loadingFrame = new LoadingFrame();
+        // Disable the main frame for the time of loading the resources.
+        this.mainFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         this.mainFrame.setEnabled(false);
     }
 
@@ -571,6 +573,7 @@ class View {
     }
 
     void closeLoadingResourcesFrame(){
+        mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         this.mainFrame.setEnabled(true);
         this.loadingFrame.setVisible(false);
         this.loadingFrame.dispose();
@@ -578,9 +581,11 @@ class View {
 
     void openEditLessonFrame(final ArrayList<String> flashcardsQuestionsList) {
         editLessonFrame = new EditLessonFrame(flashcardsQuestionsList);
+        mainFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         mainFrame.setEnabled(false);
     }
     void closeEditLessonFrame(){
+        mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         mainFrame.setEnabled(true);
         editLessonFrame.setVisible(false);
         editLessonFrame.dispose();
@@ -588,9 +593,11 @@ class View {
 
     void openEditFlashcardFrame(Optional<String> question, Optional<String> answer) {
         editFlashcardFrame = new EditFlashcardFrame(question, answer);
+        editLessonFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         editLessonFrame.setEnabled(false);
     }
     void closeEditFlashcardFrame() {
+        editLessonFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         editLessonFrame.setEnabled(true);
         editFlashcardFrame.setVisible(false);
         editFlashcardFrame.dispose();
@@ -599,10 +606,13 @@ class View {
     void openLearnLessonFrame(Optional<String> initialQuestion, Optional<Integer> initialGrade,
                               long learnedFlashcardsCount, int allFlashcardsCount){
         learningFrame = new LearningFrame(initialQuestion, initialGrade, learnedFlashcardsCount, allFlashcardsCount);
+        mainFrame.setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
         mainFrame.setEnabled(false);
     }
     void closeLearnLessonFrame(){
+        mainFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         mainFrame.setEnabled(true);
+
         learningFrame.setVisible(false);
         learningFrame.dispose();
     }
