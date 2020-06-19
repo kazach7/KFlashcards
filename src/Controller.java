@@ -19,52 +19,6 @@ class Controller {
 
         view.initializeLessonsList(model.getLessonNamesList());
         view.closeLoadingResourcesFrame();
-        /*ArrayList<String> lessonsList = fileManager.loadLessonsListFromFile();
-
-        boolean[] rememberDecision = {false, false};
-        int[] decision = {1,1};
-        for (String lessonName : lessonsList) {
-            ArrayList<String> lessonAsString;
-            try {
-                lessonAsString = fileManager.loadLessonFromFile(lessonName);
-            } catch (FileNotFoundException e) {
-                throw new FileNotFoundException(e.getMessage());
-            }
-
-            if (lessonAsString.size() % 3 != 0){
-                    if (!rememberDecision[0]) {
-                        int dec = view.displayOptionDialog("Lesson '" + lessonName + "' data has been corrupted. " +
-                                        "Loading it may lead to missing files and/or erroneous flashcards. Load anyway?",
-                                "Question", new String[]{"Yes", "No", "Yes, remember decision", "No, remember decision"}, 1);
-                        if (dec > 1) {
-                            rememberDecision[0] = true;
-                            decision[0] = dec - 2;
-                        }
-                    }
-                    if (decision[0] == 1) {
-                        if (!rememberDecision[1]) {
-                            int dec = view.displayOptionDialog("Remove the lesson?", "Question",
-                                    new String[]{"Yes", "No", "Yes, remember decision", "No, remember decision"}, 1);
-                            if (dec > 1) {
-                                rememberDecision[1] = true;
-                                decision[1] = dec - 2;
-                            }
-                        }
-                        if (decision[1] == 0) {
-                            // remove lesson.
-                        }
-                        continue;
-                    }
-                    // User wants to load it - remove the incomplete ending;
-                   do lessonAsString.remove(lessonAsString.size()-1);
-                   while (lessonAsString.size() % 3 != 0);
-            }
-
-                // Load the lesson into the model.
-                model.addLesson(lessonName, lessonAsString);
-            }
-
-        }*/
     }
 
     /* Responses to actions related to the main frame and the editing frames. */
@@ -84,7 +38,6 @@ class Controller {
         view.openEditLessonFrame(model.getFlashcardQuestionsList(lessonIndex));
     }
     void finishEditingLesson() {
-        //model.saveLessonStateInFile();
         view.closeEditLessonFrame();
     }
     void startLearningLesson(int lessonIndex) {
@@ -106,7 +59,6 @@ class Controller {
     }
     void finishLearningLesson (int lessonIndex){
         model.updateAllGradesInLessonInDatabase(lessonIndex);
-        //model.saveLessonStateInFile();
         view.closeLearnLessonFrame();
     }
 
@@ -180,46 +132,3 @@ class Controller {
         }
     }
 }
-   /*
-    void createMainFrameButtonListeners() {
-        ActionListener addLessonButtonListener = e -> addLesson();
-        ActionListener editLessonButtonListener = e -> editLesson();
-        ActionListener removeLessonButtonListener = e -> removeLesson();
-        ActionListener learnLessonButtonListener = e -> learnLesson();
-
-        view.addMainFrameButtonListeners(addLessonButtonListener, editLessonButtonListener, removeLessonButtonListener,
-                learnLessonButtonListener);
-    }
-
-    void createAddLessonFrameButtonListeners() {
-        ActionListener saveLessonButtonListener = e -> saveLesson();
-        ActionListener cancelAddingLessonButtonListener = e -> cancelAddingLesson();
-
-        view.addAddLessonFrameButtonListeners(saveLessonButtonListener, cancelAddingLessonButtonListener);
-    }
-
-    void createEditLessonFrameButtonListeners() {
-        ActionListener addFlashcardButtonListener = e -> addFlashcard();
-        ActionListener editFlashcardButtonListener = e -> editFlashcard();
-        ActionListener removeFlashcardButtonListener = e -> removeFlashcard();
-
-        view.addEditLessonFrameButtonListeners(addFlashcardButtonListener, editFlashcardButtonListener, removeFlashcardButtonListener);
-    }
-
-    void createEditFlashcardFrameButtonListeners() {
-        ActionListener saveFlashcardButtonListener = e -> saveEditedFlashcard();
-        ActionListener cancelEditingFlashcardButtonListener = e -> cancelEditingFlashcard();
-
-        view.addEditFlashcardFrameButtonListeners(saveFlashcardButtonListener, cancelEditingFlashcardButtonListener);
-    }
-
-    void createLearningFrameButtonListeners() {
-        ActionListener randomOrderButtonListener = e -> setRandomOrder();
-        ActionListener gradeOrderButtonListener = e -> setGradeOrder();
-        ActionListener resetButtonListener = e -> resetAllGrades();
-        ActionListener checkButtonListener = e -> checkAnswer();
-        ActionListener nextButtonListener = e -> askNextQuestion();
-
-        view.addLearningFrameButtonListeners(randomOrderButtonListener, gradeOrderButtonListener, resetButtonListener,
-                checkButtonListener, nextButtonListener);
-    }*/

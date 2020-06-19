@@ -9,7 +9,6 @@ class View {
 
     // Windows (frames).
     private MainFrame mainFrame;                   // Main frame of the app, containing a list of lessons.
-    //private AddLessonFrame addLessonFrame;         // Providing name for a new lesson frame.
     private EditLessonFrame editLessonFrame;       // Lesson editing frame.
     private EditFlashcardFrame editFlashcardFrame; // Flashcard editing frame.
     private LearningFrame learningFrame;           // Learning a lesson frame.
@@ -74,7 +73,6 @@ class View {
                 learnLessonButton.setEnabled(false);
             }
 
-            //setLayout(new BorderLayout());
             setTitle("KFlashcards");
             setDefaultCloseOperation(EXIT_ON_CLOSE);
             setSize(600, 350);
@@ -89,8 +87,8 @@ class View {
                 public void actionPerformed(ActionEvent e) {
                     if (e.getSource() == addLessonButton) {
                         String lessonName;
-                        // TODO moze mozna jakos nie zamykac dialogu w przypadku gdy wprowadzone zostana bledne dane?
-                        // TODO tzn. pusta nazwa, powtarzajaca sie nazwa (edit: zakladka w firefoksie - obczaj)
+                        // TODO maybe not close the dialog after invalid input (empty/not unique name)?
+                        //  Chekout the bookmark in Firefox.
                         if ((lessonName = JOptionPane.showInputDialog(mainFrame, "Enter the lesson name", "Add lesson", JOptionPane.PLAIN_MESSAGE))
                                 != null){
                             controller.addLesson(lessonName);
@@ -504,8 +502,8 @@ class View {
             nextButton.addActionListener(buttonListener);
             answerTextField.addActionListener(buttonListener);
 
-            // TODO umozliwic pobranie nastepnego pytania enterem po sprawdzeniu odpowiedzi?
-            // ale w sumie teraz mozna spacja. Przydaloby sie za to dac domyslny focus w okienku wpisywania
+            // TODO get next question with ENTER after checking the answer? (now can do it with spacebar)
+            //  Also, automatical focus on the textfield.
 
         }
 
@@ -691,18 +689,8 @@ class View {
     void displayMessage(String message) {
         JOptionPane.showMessageDialog(mainFrame, message);
     }
-    int displayOptionDialog(String message, String title, String[] options, int defaultValue){
+    /*int displayOptionDialog(String message, String title, String[] options, int defaultValue){
         return JOptionPane.showOptionDialog(mainFrame,  message, title, JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE,
                 null, options, options[defaultValue]);
-    }
-   /*void openAddLessonFrame() {
-        addLessonFrame = new AddLessonFrame();
-        mainFrame.setEnabled(false);
-    }
-
-    void closeAddLessonFrame() {
-        mainFrame.setEnabled(true); // mainFrame must be enabled before addLessonFrame is disposed, otherwise it hides.
-        addLessonFrame.setVisible(false);
-        addLessonFrame.dispose();
     }*/
 }
