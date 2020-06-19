@@ -1,15 +1,19 @@
-class Flashcard {
+import java.io.Serializable;
+
+class Flashcard implements Serializable {
     private String question;
     private String answer;
     private int grade;
 
-    Flashcard (String question, String answer){
+    Flashcard (String question, String answer, int grade){
+        super();
         this.question = question;
         this.answer = answer;
-        this.grade = 1;
+        this.grade = grade;
     }
-
-
+    Flashcard (String question, String answer){
+        this(question, answer, 1);
+    }
     String getQuestion() {
         return question;
     }
@@ -24,35 +28,14 @@ class Flashcard {
         this.answer = answer;
     }
 
-    void incGrade() throws IllegalStateException{
-        if (grade == 6){
-            throw new IllegalStateException("Can't increment the maximum grade!");
-        }
-        else {
-            ++grade;
-        }
-    }
-    void setGrade(int value) throws IllegalArgumentException {
-        if (value < 1 || value > 6){
-            throw new IllegalArgumentException("Grade must an integer between 1 and 6");
-        }
-        else{
-            grade = value;
-        }
-    }
-
     int getGrade(){
         return grade;
 
     }
-    /*boolean compareAnswers (String userAnswer){
-        return this.answer.equals(userAnswer);
+    void incrementGrade() {
+        ++grade;
     }
-    /*public int getNumber() {
-        return number;
+    void setGrade(int value) {
+        grade = value;
     }
-
-    public void setNumber(int number) {
-        this.number = number;
-    }*/
 }

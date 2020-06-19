@@ -1,20 +1,23 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.Serializable;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 
 /**
- * Lesson is a single collection of flashcards, chosen by the user to learn.
+ * Lesson is a distinct collection of flashcards defined by the user.
  */
-class Lesson {
-    private String name;
-    private ArrayList<Flashcard> flashcardsArray;
-    private FilesManager filesManager;
+class Lesson implements Serializable {
+    String name;
+    ArrayList<Flashcard> flashcards;
 
-    Lesson (String name, FilesManager filesManager){
+    Lesson (String name){
+        this(name, new ArrayList<>());
+    }
+    Lesson (String name, ArrayList<Flashcard> flashcards){
         this.name = name;
-        this.flashcardsArray = null;
-        this.filesManager = filesManager;
+        this.flashcards = flashcards;
     }
 
     String getName() {
@@ -25,68 +28,10 @@ class Lesson {
         this.name = name;
     }
 
-    Flashcard getFlashcard (int index) {
-        Flashcard flashcard = null;
-
-        if (flashcardsArray != null) {
-            try {
-                flashcard = flashcardsArray.get(index);
-            } catch (IndexOutOfBoundsException e) {
-                e.printStackTrace();
-            }
-        }
-
-        return flashcard;
+    int getSize(){
+        return flashcards.size();
     }
-
     ArrayList<Flashcard> getFlashcardsArray(){
-        return flashcardsArray;
-    }
-
-
-    void addFlashcard (Flashcard flashcard) throws FileAlreadyExistsException{
-        if (flashcardsArray == null){
-            flashcardsArray = new ArrayList<>();
-        }
-
-        for (Flashcard existingFlashcard : flashcardsArray){
-            if (existingFlashcard.getQuestion().equals(flashcard.getQuestion())){
-                throw new FileAlreadyExistsException("Flashcard front not unique: " + flashcard.getQuestion());
-            }
-        }
-
-        flashcardsArray.add(flashcard);
-    }
-    void editFlashcard (int flashcardIndex, Flashcard flashcard) throws IndexOutOfBoundsException, FileAlreadyExistsException{
-        if (flashcardsArray == null) {
-            throw new IndexOutOfBoundsException("The lesson is empty!");
-        }
-
-        int existingFlashcardIndex = 0;
-        for (Flashcard existingFlashard : flashcardsArray){
-            // Check questions uniqueness.
-            if (existingFlashard.getQuestion().equals(flashcard.getQuestion())
-                    && existingFlashcardIndex != flashcardIndex) // Exclude the flashcard that will be replaced.
-            {
-                throw new FileAlreadyExistsException("Flashcard front not unique: " + flashcard.getQuestion());
-            }
-            ++existingFlashcardIndex;
-        }
-
-        flashcardsArray.set(flashcardIndex, flashcard);
-    }
-    void removeFlashcard (int flashcardIndex) throws IndexOutOfBoundsException {
-        flashcardsArray.remove(flashcardIndex);
-
-        filesManager.removeFlashcard(flashcardIndex, this.name);
-        /*try{
-            if (setsFilesManager != null)
-                setsFilesManager.updateSetFile(this);
-            else
-                throw new Exception("SetsFileManager not assigned in Set object!");
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }*/
+        return flashcards;
     }
 }

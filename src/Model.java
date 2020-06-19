@@ -1,223 +1,240 @@
-import java.io.FileNotFoundException;
-import java.io.PrintStream;
-import java.lang.reflect.Array;
-import java.nio.file.FileAlreadyExistsException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.*;
+import java.util.stream.Collectors;
 
 class Model {
-    private FilesManager filesManager;
+    static final short MAX_GRADE = 6;
 
+    private View view;
+    private DatabaseManager databaseManager;
     private ArrayList<Lesson> lessons;
-    private ArrayList<Flashcard> flashcards;    // Flashcards of currently learned lesson.
-    private int currentFlashcardIndex;          // Currently displayed flashcard in the learning.
-    private int maxGrade;
 
-    Model() {
-        lessons = null;
-        flashcards = null;
-        filesManager = new FilesManager();
-        maxGrade = 6; // Default value, the controller will update it anyway.
+    private ArrayList<Flashcard> currentLessonFlashcards; // Flashcards from the currently learned lesson.
+    int currentFlashcardIndex; // The flashcard currently being displayed in the learning frame.
+
+    Model(View view, DatabaseManager databaseManager) {
+        this.view = view;
+        this.databaseManager = databaseManager;
+        this.lessons = new ArrayList<>();
+        this.currentFlashcardIndex = 0;
     }
 
-    ArrayList<Lesson> getLessons(){
-        return lessons;
+    void loadResourcesFromFiles() throws Exception{
+        lessons = databaseManager.getAllLessons();
     }
 
-
-    // TODO czy to dobre rozwiazanie?
-    void setMaxGrade(int maxGrade) {
-        this.maxGrade = maxGrade;
+    ArrayList<String> getLessonNamesList(){
+        return lessons.stream()
+                .map(Lesson::getName)
+                .collect(Collectors.toCollection(ArrayList::new));
+    }
+    ArrayList<String> getFlashcardQuestionsList (int lessonIndex) {
+        assert (lessonIndex < lessons.size());
+        return lessons.get(lessonIndex).getFlashcardsArray()
+                .stream()
+                .map(Flashcard::getQuestion)
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
-    void loadResourcesFromFiles() throws FileNotFoundException{
-        lessons = new ArrayList<>();
-        ArrayList<String> lessonsList = filesManager.getLessonsList();
+    boolean addLesson (String lessonName) {
+        if (lessonName.length() == 0) {
+            view.displayMessage("The lesson name can't be empty!");
+            return false;
+        }
+        else if (lessonName.contains("\\") || lessonName.contains("/") || lessonName.contains("\"")){
+            view.displayMessage("The lesson name can't contain characters: \", \\, /");
+            return false;
+        }
+        if (lessons.stream().anyMatch(l -> (l.getName().equals(lessonName)))){
+            view.displayMessage("Lesson names must be unique!");
+            return false;
+        }
 
-        if (lessonsList != null) {
-            for (String lessonName : lessonsList) {
-                try {
-                    lessons.add(filesManager.loadLessonFromFile(lessonName));
-                } catch (FileNotFoundException e) {
-                    throw new FileNotFoundException(e.getMessage());
-                }
+        Lesson lesson = new Lesson(lessonName);
+        try {
+            databaseManager.addLesson(lesson);
+        } catch (Exception e){
+            view.displayMessage("An unexpected error occurred while adding the lesson.\n" +
+                    "Please try again.");
+            return false;
+        }
+        lessons.add(lesson);
+
+        return true;
+    }
+    boolean removeLesson(int lessonIndex){
+        assert (lessonIndex < lessons.size());
+        try {
+            databaseManager.removeLesson(lessons.get(lessonIndex).getName());
+        } catch (Exception e){
+            view.displayMessage("An unexpected error occurred while removing the lesson.\n" +
+                    "Please try again.");
+            return false;
+        }
+        lessons.remove(lessonIndex);
+
+        return true;
+    }
+
+    boolean saveFlashcard (int flashcardIndex, int lessonIndex, String question, String answer) {
+        assert (lessonIndex < lessons.size());
+        Lesson lesson = lessons.get(lessonIndex);
+        assert (flashcardIndex <= lesson.getSize());
+
+        if (question.length() == 0) {
+            view.displayMessage("The front can't be empty!");
+            return false;
+        }
+        else if (question.contains("\"") || question.contains("\\") || question.contains("/") ||
+                answer.contains("\"") || answer.contains("\\") || answer.contains("/")) {
+            view.displayMessage("Flashcards can't contain characters: \", \\, /");
+            return false;
+        }
+        for (int i = 0; i < lesson.getSize(); ++i){
+            if (i == flashcardIndex){
+                continue;
             }
-        }
-    }
-
-    void setCurrentLesson(int lessonIndex) throws IndexOutOfBoundsException{
-        flashcards = lessons.get(lessonIndex).getFlashcardsArray();
-    }
-
-    boolean checkLessonEmptiness(){
-        return (flashcards == null || flashcards.size() == 0);
-    }
-
-    void randomOrder(){
-        try{
-            Collections.shuffle(flashcards);
-        }
-        catch (NullPointerException e){
-            e.printStackTrace();
-        }
-
-        // Next displayed flashcard will have the 0 index.
-        currentFlashcardIndex = -1;
-    }
-
-    void gradeOrder(){
-        flashcards.sort(new Comparator<Flashcard>() {
-            @Override
-            public int compare(Flashcard o1, Flashcard o2) {
-                return Integer.compare(o1.getGrade(), o2.getGrade());
-            }
-        });
-
-        // Next displayed flashcard will have the 0 index.
-        currentFlashcardIndex = -1;
-    }
-
-    void resetAllGrades() throws NullPointerException{
-        for (int i = 0; i < flashcards.size(); ++i){
-            flashcards.get(i).setGrade(1);
-        }
-    }
-
-    void correctAnswer(){
-        flashcards.get(currentFlashcardIndex).incGrade();
-    }
-    void incorrectAnswer(){
-        flashcards.get(currentFlashcardIndex).setGrade(1);
-    }
-
-    Flashcard getCurrentFlashcard() throws NullPointerException {
-        if (flashcards == null){
-            return null;
-        }
-        return flashcards.get(currentFlashcardIndex);
-    }
-    Flashcard getFlashcardToDisplay() throws NullPointerException{
-        Flashcard flashcard = null;
-
-        // Skip learned flashcards.
-        for (int i = 0; i<flashcards.size(); ++i){
-            currentFlashcardIndex = (currentFlashcardIndex + 1)% flashcards.size();
-            if ((flashcard = flashcards.get(currentFlashcardIndex)).getGrade() != maxGrade){
-                return flashcard;
+            if (lesson.getFlashcardsArray().get(i).getQuestion().equals(question)){
+                view.displayMessage("Flashcards' fronts must be unique!");
+                return false;
             }
         }
 
-        return null;
-    }
-
-    int getLearnedFlashcardsQuantity() throws NullPointerException{
-        int quantity = 0;
-
-        for (int i = 0; i < flashcards.size(); ++i){
-            if (flashcards.get(i).getGrade() == maxGrade){
-                ++quantity;
+        if (flashcardIndex < lesson.getSize()){
+            Flashcard flashcard = new Flashcard(question, answer, 1);
+            try {
+                databaseManager.editFlashcard(lesson.getName(), lesson.getFlashcardsArray().get(flashcardIndex).getQuestion(),
+                        flashcard);
+            } catch (Exception e){
+                view.displayMessage("An unexpected error occurred while editing the flashcard.\n" +
+                        "Please try again.");
+                return false;
             }
+            lesson.getFlashcardsArray().set(flashcardIndex, flashcard);
         }
-        return quantity;
+        else {
+            Flashcard flashcard = new Flashcard(question, answer, 1);
+            try {
+                databaseManager.addFlashcard(lesson.getName(), flashcard);
+            } catch (Exception e){
+                view.displayMessage("An unexpected error occurred while adding the flashcard.\n" +
+                        "Please try again.");
+                return false;
+            }
+            lesson.getFlashcardsArray().add(flashcard);
+        }
+
+        return true;
+    }
+    boolean removeFlashcard (int flashcardIndex, int lessonIndex) {
+        assert (lessonIndex < lessons.size());
+        Lesson lesson = lessons.get(lessonIndex);
+        assert (flashcardIndex < lesson.getSize());
+        try {
+            databaseManager.removeFlashcard(lesson.getName(), lesson.getFlashcardsArray().get(flashcardIndex).getQuestion());
+        } catch (Exception e){
+            view.displayMessage("An unexpected error occurred while removing the flashcard.\n" +
+                    "Please try again.");
+            return false;
+        }
+        lesson.getFlashcardsArray().remove(flashcardIndex);
+
+        return true;
+    }
+    String getFlashcardQuestion (int flashcardIndex, int lessonIndex) {
+        assert (lessonIndex < lessons.size());
+        Lesson lesson = lessons.get(lessonIndex);
+        assert (flashcardIndex < lesson.getSize());
+        return lesson.getFlashcardsArray().get(flashcardIndex).getQuestion();
+    }
+    String getFlashcardAnswer (int flashcardIndex, int lessonIndex) {
+        assert (lessonIndex < lessons.size());
+        Lesson lesson = lessons.get(lessonIndex);
+        assert (flashcardIndex < lesson.getSize());
+        return lesson.getFlashcardsArray().get(flashcardIndex).getAnswer();
     }
 
+    void setCurrentLesson(int lessonIndex) {
+        currentLessonFlashcards = lessons.get(lessonIndex).getFlashcardsArray();
+    }
     int getCurrentLessonSize() throws NullPointerException{
-        return flashcards.size();
+        assert (currentLessonFlashcards != null);
+        return currentLessonFlashcards.size();
+    }
+    boolean setRandomOrder(){
+        assert (currentLessonFlashcards != null);
+        Collections.shuffle(currentLessonFlashcards);
+        return this.setCurrentFlashcardToFirstNotLearned(0);
+
+    }
+    boolean setGradeOrder(){
+        assert (currentLessonFlashcards != null);
+        currentLessonFlashcards.sort(Comparator.comparingInt(Flashcard::getGrade));
+        return this.setCurrentFlashcardToFirstNotLearned(0);
     }
 
-    void updateGradesInFile(int lessonIndex){
-        try {
-            filesManager.updateGrades(flashcards, lessons.get(lessonIndex).getName());
-        }
-        catch (IndexOutOfBoundsException e){
-            e.printStackTrace();
-        }
-    }
-    void addLesson (String lessonName) throws FileAlreadyExistsException{
-        if (lessons != null)
-        {
-            // Check name uniqueness.
-            for (Lesson lesson : lessons) {
-                if (lesson.getName().equals(lessonName)) {
-                    throw new FileAlreadyExistsException("Lesson name already used! Name: " + lessonName);
-                }
+    private boolean setCurrentFlashcardToFirstNotLearned(int startingIndex){
+        int size = currentLessonFlashcards.size();
+        currentFlashcardIndex = startingIndex < size ? startingIndex : 0;
+        int i = 0;
+        while (currentLessonFlashcards.get(currentFlashcardIndex).getGrade() == Model.MAX_GRADE){
+            if (++currentFlashcardIndex == size){
+                currentFlashcardIndex = 0;
+            }
+            if (++i == size){
+                return false;
             }
         }
-        else{
-            lessons = new ArrayList<Lesson>();
-        }
-
-        lessons.add(new Lesson(lessonName, filesManager));
-
-        filesManager.addLesson(lessonName);
+        return true;
     }
 
-    void removeLesson(int lessonIndex){
-        try{
-            lessons.remove(lessonIndex);
-        }
-        catch(IndexOutOfBoundsException e){
-            e.printStackTrace();
-        }
-
-        filesManager.removeLesson(lessonIndex);
+    boolean setCurrentFlashcardToNextOne() {
+        assert (currentLessonFlashcards != null);
+        return this.setCurrentFlashcardToFirstNotLearned(currentFlashcardIndex+1);
     }
 
-    ArrayList<String> getFlashcardsQuestions(int lessonIndex){
-        Lesson lesson = null;
+    String getCurrentFlashcardQuestion() {
+        assert (currentLessonFlashcards != null);
+        return currentLessonFlashcards.get(currentFlashcardIndex).getQuestion();
+    }
+    String getCurrentFlashcardAnswer() {
+        assert (currentLessonFlashcards != null);
+        return currentLessonFlashcards.get(currentFlashcardIndex).getAnswer();
+
+    }
+    int getCurrentFlashcardGrade() {
+        assert (currentLessonFlashcards != null);
+        return currentLessonFlashcards.get(currentFlashcardIndex).getGrade();
+    }
+    void incrementCurrentFlashcardGrade(){
+        assert (currentLessonFlashcards != null);
+        currentLessonFlashcards.get(currentFlashcardIndex).incrementGrade();
+    }
+    void resetCurrentFlashcardGrade(){
+        assert (currentLessonFlashcards != null);
+        currentLessonFlashcards.get(currentFlashcardIndex).setGrade(1);
+    }
+    void resetAllGradesInCurrentLesson() {
+        assert (currentLessonFlashcards != null);
+        currentLessonFlashcards.forEach(f -> f.setGrade(1));
+    }
+    long getLearnedFlashcardsInCurrentLessonCount() {
+        assert (currentLessonFlashcards != null);
+        return currentLessonFlashcards.stream()
+                .filter(f -> (f.getGrade() == MAX_GRADE))
+                .count();
+    }
+
+
+    // TODO not any lesson, but currently learned lesson?
+    //  In that case pass currentLessonFlashcards to DatabaseManager,
+    //  but we still need the lesson index (passing it to the method like now would be ugly).
+    void updateAllGradesInLessonInDatabase(int lessonIndex) {
+        Lesson lesson = lessons.get(lessonIndex);
         try {
-            lesson = lessons.get(lessonIndex);
-        }
-        catch (NullPointerException e) {
-            throw new NullPointerException("The lesson does not exist!");
-        }
-        catch (Exception e){
-            e.printStackTrace();
-            return null;
-        }
-
-        ArrayList<Flashcard> flashcardsArray = lesson.getFlashcardsArray();
-
-        if (flashcardsArray == null) {
-            return null;
-        }
-
-        ArrayList<String> flashcardsQuestions = new ArrayList<>();
-
-        for (Flashcard flashcard : flashcardsArray) {
-                flashcardsQuestions.add(flashcard.getQuestion());
-        }
-
-        return flashcardsQuestions;
-    }
-
-    Flashcard getFlashcard (int flashcardIndex, int lessonIndex) throws IndexOutOfBoundsException{
-        Flashcard flashcard = null;
-        flashcard = lessons.get(lessonIndex).getFlashcard(flashcardIndex);
-        return flashcard;
-    }
-
-    void saveFlashcard (int flashcardIndex, int lessonIndex, Flashcard flashcard) throws FileAlreadyExistsException{
-        try {
-            Lesson lesson = lessons.get(lessonIndex);
-            if (lesson.getFlashcardsArray() == null || lesson.getFlashcardsArray().size() == flashcardIndex){
-                // A new flashcard.
-                lesson.addFlashcard(flashcard);
-                filesManager.addFlashcard(flashcard, lesson.getName());
-            }
-            else {
-                lesson.editFlashcard(flashcardIndex, flashcard);
-                filesManager.editFlashcard(flashcard, flashcardIndex, lessons.get(lessonIndex).getName());
-            }
-        }
-        catch (IndexOutOfBoundsException e){
-            e.printStackTrace();
+            databaseManager.updateAllGradesInLesson(lesson.getName(), lesson.getFlashcardsArray());
+        } catch (Exception e){
+            view.displayMessage("An unexpected error occurred while saving the learning results.\n" +
+                    "The grades changes will be lost after the application is restarted. We are sorry for the inconvenience.");
         }
     }
-
-    void removeFlashcard (int flashcardIndex, int lessonIndex) throws IndexOutOfBoundsException{
-        lessons.get(lessonIndex).removeFlashcard(flashcardIndex);
-    }
-
 }
