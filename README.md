@@ -13,6 +13,7 @@ I recommend running on Windows for the best user experience. The application was
 
 ### TODO
 * Fix the 'Edit flashcard' frame, which doesn't look nice on Ubuntu.
+* Refactor so that as little data as possible is kept in RAM.
 * Consider adding a button to switch questions with answers in a whole lesson.
 * Try to enable getting next question with ENTER after the answer has been checked (now it can be done with spacebar).
 * Try to enable automatical focus on the textfield in the 'learning' frame.
